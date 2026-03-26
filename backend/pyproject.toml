@@ -1,0 +1,20 @@
+[project]
+name = "manufacturing-agents"
+version = "0.1.0"
+description = "Multi-agent manufacturing intelligence PoC"
+requires-python = ">=3.12"
+dependencies = [
+    "agent-framework",
+    "agent-framework-ag-ui",
+    "fastapi",
+    "uvicorn[standard]",
+    "aiosqlite",
+    "python-dotenv",
+    "openai",
+    "azure-identity",
+    "numpy",
+]
+
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
