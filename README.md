@@ -24,6 +24,89 @@ Built for customer workshops to demonstrate how AI agents can assist with demand
 
 ## Architecture
 
+```mermaid
+graph TB
+    subgraph Frontend["Frontend (Next.js 15 + CopilotKit)"]
+        direction TB
+        UI["Dashboard UI<br/>KPIs · Charts · Pipeline"]
+        Chat["CopilotKit Chat<br/>AG-UI Streaming"]
+        Hub["Agent Hub<br/>Orchestration Viz · Activity Feed"]
+        Proxy["/api/copilotkit<br/>CopilotRuntime Proxy"]
+    end
+
+    subgraph Backend["Backend (Python · FastAPI)"]
+        direction TB
+        AGUI["AG-UI Endpoint<br/>/agent SSE"]
+        API["Dashboard API<br/>/api/dashboard"]
+        Pipeline["HITL Pipeline<br/>/api/pipeline/easter-rush"]
+        Events["Events Stream<br/>/api/events/stream SSE"]
+    end
+
+    subgraph Orchestrator["Manufacturing Orchestrator"]
+        ORC["Orchestrator Agent<br/>GPT-5"]
+    end
+
+    subgraph Specialists["Specialist Agents"]
+        direction LR
+        Demand["Demand Forecaster<br/>GPT-5"]
+        Quality["Quality Inspector<br/>GPT-5"]
+        Supply["Supply Chain Mgr<br/>GPT-5-mini"]
+    end
+
+    subgraph Tools["Function Tools - tracked_tool"]
+        direction LR
+        SalesTools["Sales Tools<br/>query_sales_history<br/>get_seasonal_forecast<br/>compare_year_over_year"]
+        QualityTools["Quality Tools<br/>get_quality_metrics<br/>detect_anomalies<br/>search_quality_docs"]
+        SupplyTools["Supply Tools<br/>check_inventory<br/>get_reorder_alerts<br/>calculate_material_needs"]
+        SAPTools["SAP MCP Tools<br/>sap_get_production_orders<br/>sap_get_material_master<br/>sap_get_stock_overview"]
+    end
+
+    subgraph Data["Data Layer"]
+        direction LR
+        DB[("SQLite<br/>27 products · 21K+ sales<br/>5 lines · 15 materials")]
+        Docs["Quality Docs<br/>SOPs · HACCP Plans<br/>RAG / Embeddings"]
+    end
+
+    subgraph Foundry["Azure AI Foundry"]
+        direction LR
+        GPT5["GPT-5"]
+        GPT5Mini["GPT-5-mini"]
+        Embed["text-embedding-large"]
+    end
+
+    UI --> API
+    Chat --> Proxy
+    Hub --> Events
+    Proxy --> AGUI
+    AGUI --> ORC
+    Pipeline --> Demand
+    Pipeline --> Quality
+    Pipeline --> Supply
+    ORC -->|"tool call"| Demand
+    ORC -->|"tool call"| Quality
+    ORC -->|"tool call"| Supply
+    Demand --> SalesTools
+    Quality --> QualityTools
+    Supply --> SupplyTools
+    Supply --> SAPTools
+    SalesTools --> DB
+    QualityTools --> DB
+    QualityTools --> Docs
+    SupplyTools --> DB
+    SAPTools --> DB
+    ORC -.->|"API"| GPT5
+    Demand -.->|"API"| GPT5
+    Quality -.->|"API"| GPT5
+    Supply -.->|"API"| GPT5Mini
+    Docs -.->|"embed"| Embed
+    Demand -->|"push_event"| Events
+    Quality -->|"push_event"| Events
+    Supply -->|"push_event"| Events
+```
+
+<details>
+<summary>Text-based architecture (for terminals without Mermaid support)</summary>
+
 ```
 Frontend (Next.js 15 + CopilotKit + shadcn/ui)
   ├── Dashboard Tab: KPIs, revenue/volume charts, inventory, quality monitor
@@ -57,6 +140,8 @@ Azure AI Foundry
   ├── GPT-5 / GPT-5-mini (chat + reasoning)
   └── text-embedding-large (RAG)
 ```
+
+</details>
 
 ---
 
