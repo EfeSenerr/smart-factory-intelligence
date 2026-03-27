@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import { CopilotKit } from "@copilotkit/react-core";
+import { Toaster } from "sonner";
 import "@copilotkit/react-ui/styles.css";
 import "./globals.css";
 
@@ -33,6 +34,13 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <CopilotKit runtimeUrl="/api/copilotkit">
           {children}
+          <Toaster
+            theme="dark"
+            position="top-right"
+            richColors
+            expand
+            duration={8000}
+          />
         </CopilotKit>
       </body>
     </html>

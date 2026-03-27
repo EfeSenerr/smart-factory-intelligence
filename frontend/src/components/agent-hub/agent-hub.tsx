@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +19,7 @@ import {
   Send,
   Database,
   Wrench,
+  Rocket,
 } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -80,6 +83,18 @@ export function AgentHub() {
           setTimeout(() => {
             setAgentStatuses((prev) => ({ ...prev, [event.agent]: "idle" }));
           }, 5000);
+        } else if (event.event_type === "action_executed") {
+          // Show toast for actions
+          const detail = event.detail || "";
+          if (detail.includes("Purchase Order")) {
+            toast.success(detail, { description: "Purchase order created in SAP" });
+          } else if (detail.includes("Production Order")) {
+            toast.success(detail, { description: "Production run scheduled" });
+          } else if (detail.includes("Notification")) {
+            toast.info(detail, { description: "Notification dispatched" });
+          } else {
+            toast.success(detail);
+          }
         } else if (event.event_type === "error") {
           setAgentStatuses((prev) => ({ ...prev, [event.agent]: "error" }));
         }
@@ -185,6 +200,7 @@ export function AgentHub() {
       case "agent_end": return <CheckCircle2 className="h-3 w-3 text-emerald-400" />;
       case "tool_call": return <Database className="h-3 w-3 text-cyan-400" />;
       case "tool_result": return <Wrench className="h-3 w-3 text-violet-400" />;
+      case "action_executed": return <Rocket className="h-3 w-3 text-orange-400" />;
       case "error": return <AlertCircle className="h-3 w-3 text-red-400" />;
       default: return <Zap className="h-3 w-3 text-muted-foreground" />;
     }
@@ -196,6 +212,7 @@ export function AgentHub() {
       case "agent_end": return "border-emerald-500/30";
       case "tool_call": return "border-cyan-500/20";
       case "tool_result": return "border-violet-500/20";
+      case "action_executed": return "border-orange-500/40";
       case "error": return "border-red-500/30";
       default: return "border-primary/20";
     }
@@ -205,6 +222,7 @@ export function AgentHub() {
     if (agent.includes("Demand")) return "text-blue-400";
     if (agent.includes("Quality")) return "text-emerald-400";
     if (agent.includes("Supply")) return "text-amber-400";
+    if (agent === "System") return "text-orange-400";
     return "text-muted-foreground";
   };
 
@@ -238,7 +256,13 @@ export function AgentHub() {
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted/50 border border-border/50"
                     }`}>
-                      <div className="whitespace-pre-wrap">{msg.content}</div>
+                      {msg.role === "user" ? (
+                        <div className="whitespace-pre-wrap">{msg.content}</div>
+                      ) : (
+                        <div className="prose prose-xs prose-invert max-w-none [&_p]:my-1 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_strong]:text-foreground [&_p]:text-muted-foreground [&_li]:text-muted-foreground">
+                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
