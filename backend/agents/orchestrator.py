@@ -30,17 +30,36 @@ How to work:
 - For complex questions that span multiple domains, break them down and delegate to multiple specialists
 - Synthesize the results from multiple specialists into a coherent, actionable answer
 - Always provide a clear summary with specific numbers and recommendations
+- NEVER ask the user for clarification. You have ALL the data you need via your tools. Just query the tools and provide a definitive answer.
+- When the user asks about a product, assume the standard SKU from the product catalog. Do NOT ask for SKU confirmation.
+
+Key business context you already know:
+- Today is March 27, 2026
+- The company produces confectionery at a factory in Germany with 5 production lines
+- Main product: Schokoladen-Osterhase (SKU: SEA-OST-001, 150g, chocolate Easter bunny)
+- Also: Osterhasen Mini-Mix 10er (SEA-OST-003), Ostereier Nougat-Füllung (SEA-OST-002), Osternest Pralinenmischung (SEA-OST-004)
+- Chocolate lines 1+2: combined capacity ~3,800 units/hour at current efficiency
+- All raw material inventory is tracked in the system — query it, don't ask the user
+- All production orders are in the system — query them, don't ask the user
+- SAP data is available via tools — use sap_get_production_orders, sap_get_stock_overview
 
 Examples of multi-agent queries:
 - "Can we fulfill a large Easter order?" → Ask DemandForecasting for current commitments, SupplyChain for material availability, QualityControl for line capacity
 - "What's our overall production status?" → Ask QualityControl for line status, SupplyChain for active orders, DemandForecasting for upcoming demand
 
 Communication style:
+- ALWAYS respond in English, or what the user writes
 - Professional but approachable
-- Data-driven with specific numbers
-- Action-oriented recommendations
-- Use German product names naturally (Osterhasen, Weihnachtsmänner, etc.)
+- Data-driven with specific numbers from tool queries
+- Action-oriented: give a GO / CONDITIONAL / NO-GO recommendation, not questions
+- Use German product names naturally in parentheses, e.g. "Easter bunnies (Osterhasen)"
 - Structure complex answers with clear sections
+
+When the user approves an action or says "go ahead", "approved", "do it", "proceed", etc.:
+- Use the ACTION tools to execute: place_purchase_order, schedule_production, send_notification
+- These create real system actions (purchase orders, production schedules, notifications)
+- Always confirm what actions you took with specific details (order numbers, quantities, dates)
+- You can take multiple actions in sequence — e.g. place orders AND schedule production
 """
 
 
@@ -104,6 +123,66 @@ def create_orchestrator():
             push_event(AgentEvent(timestamp=time.time(), event_type="error", agent="SupplyChainMgr", detail=str(e), elapsed=elapsed))
             return f"Supply chain analysis encountered an issue: {e}. Please try a more specific question."
 
+    # ── Action Tools — execute real business actions ──
+
+    @tool(name="place_purchase_order", description="Place a purchase order for raw materials with a supplier. Use when the user approves a material reorder or when material shortfalls are identified and the user says to proceed.")
+    async def place_purchase_order(
+        material_name: Annotated[str, "Raw material name, e.g. 'Kakaobohnen', 'Kakaobutter'"],
+        quantity: Annotated[float, "Quantity to order"],
+        unit: Annotated[str, "Unit of measure, e.g. 'kg', 'Rolle', 'Palette'"],
+        supplier: Annotated[str, "Supplier name"],
+        urgency: Annotated[str, "Priority: 'standard', 'express', 'critical'"] = "standard",
+    ) -> str:
+        import uuid
+        po_number = f"PO-{uuid.uuid4().hex[:8].upper()}"
+        log.info("📋 PURCHASE ORDER: %s — %s %s %s from %s (%s)", po_number, quantity, unit, material_name, supplier, urgency)
+        push_event(AgentEvent(
+            timestamp=time.time(),
+            event_type="action_executed",
+            agent="System",
+            detail=f"📋 Purchase Order {po_number} created: {quantity:,.0f} {unit} {material_name} from {supplier} [{urgency}]",
+            data={"action": "purchase_order", "po_number": po_number, "material": material_name, "quantity": quantity, "unit": unit, "supplier": supplier, "urgency": urgency},
+        ))
+        return f"Purchase order {po_number} has been created and sent to {supplier} for {quantity:,.0f} {unit} of {material_name}. Priority: {urgency}. Estimated delivery based on lead time."
+
+    @tool(name="schedule_production", description="Schedule a production run on a specific line. Use when the user approves production planning or confirms a production order.")
+    async def schedule_production(
+        product_name: Annotated[str, "Product to produce, e.g. 'Schokoladen-Osterhase'"],
+        quantity: Annotated[int, "Number of units to produce"],
+        line_name: Annotated[str, "Production line, e.g. 'Schokoladen-Linie 1'"],
+        start_date: Annotated[str, "Planned start date YYYY-MM-DD"],
+        end_date: Annotated[str, "Planned end date YYYY-MM-DD"],
+        priority: Annotated[str, "Priority: 'low', 'normal', 'high'"] = "high",
+    ) -> str:
+        import uuid
+        order_id = f"PROD-{uuid.uuid4().hex[:8].upper()}"
+        log.info("🏭 PRODUCTION SCHEDULED: %s — %d× %s on %s (%s to %s)", order_id, quantity, product_name, line_name, start_date, end_date)
+        push_event(AgentEvent(
+            timestamp=time.time(),
+            event_type="action_executed",
+            agent="System",
+            detail=f"🏭 Production Order {order_id}: {quantity:,} × {product_name} on {line_name} ({start_date} → {end_date}) [{priority}]",
+            data={"action": "schedule_production", "order_id": order_id, "product": product_name, "quantity": quantity, "line": line_name, "start": start_date, "end": end_date, "priority": priority},
+        ))
+        return f"Production order {order_id} scheduled: {quantity:,} units of {product_name} on {line_name} from {start_date} to {end_date}. Priority: {priority}."
+
+    @tool(name="send_notification", description="Send a notification/email to a team or person about a decision, alert, or action. Use when coordinating across teams or confirming decisions.")
+    async def send_notification(
+        recipient: Annotated[str, "Recipient: 'production-team', 'procurement', 'quality-team', 'management', or a specific name"],
+        subject: Annotated[str, "Email/notification subject line"],
+        message: Annotated[str, "The notification message body"],
+        priority: Annotated[str, "Priority: 'low', 'normal', 'high', 'urgent'"] = "normal",
+    ) -> str:
+        log.info("📧 NOTIFICATION → %s: %s [%s]", recipient, subject, priority)
+        push_event(AgentEvent(
+            timestamp=time.time(),
+            event_type="action_executed",
+            agent="System",
+            detail=f"📧 Notification sent to {recipient}: \"{subject}\" [{priority}]",
+            data={"action": "send_notification", "recipient": recipient, "subject": subject, "message": message, "priority": priority},
+        ))
+        return f"Notification sent to {recipient} with subject \"{subject}\". Priority: {priority}."
+
     client = AzureOpenAIResponsesClient(
         project_endpoint=PROJECT_ENDPOINT,
         deployment_name=DEPLOYMENT_NAME,
@@ -115,5 +194,5 @@ def create_orchestrator():
     return client.as_agent(
         name="ManufacturingOrchestrator",
         instructions=ORCHESTRATOR_INSTRUCTIONS,
-        tools=[demand_forecasting, quality_control, supply_chain],
+        tools=[demand_forecasting, quality_control, supply_chain, place_purchase_order, schedule_production, send_notification],
     )
