@@ -123,10 +123,10 @@ async def sap_get_stock_overview() -> str:
             "Matnr": f"RM-{1000 + i}",
             "Maktx": r["material_description"],
             "Meins": r["base_unit"],
-            "Labst": r["current_stock"],  # Unrestricted stock
+            "Labst": r["unrestricted_stock"],
             "Minbe": r["reorder_point"],
             "Verpr": r["valuation_price"],
-            "Salk3": r["stock_value"],  # Total stock value
+            "Salk3": r["stock_value"],
             "Werks": "1000",
             "Lgort": "0001",
         })
